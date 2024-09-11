@@ -3,15 +3,16 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 )
 
 func main() {
 	fmt.Println("Zapuskaem server")
+	port := fmt.Sprintf(`:%s`, os.Getenv("TODO_PORT"))
 
 	webDir := "./web"
-	fmt.Println("Завершаем работу")
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
-	err := http.ListenAndServe(":7540", nil)
+	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		panic(err)
 	}
