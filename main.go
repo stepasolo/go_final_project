@@ -11,11 +11,14 @@ import (
 
 func main() {
 	dbHelper.DbWorker()
+	db := dbHelper.OpenDB()
 	fmt.Println("Zapuskaem server")
 	http.HandleFunc("/api/nextdate", nextDateHandler)
 	//port := fmt.Sprintf(`:%s`, os.Getenv("TODO_PORT"))
 	port := fmt.Sprintf(`0.0.0.0:%s`, os.Getenv("TODO_PORT")) //для работы через WSL
 	fmt.Println(port)
+
+	http.HandleFunc("/api/task", PostTaskHandler(db))
 
 	webDir := "./web"
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
@@ -42,9 +45,11 @@ func nextDateHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		response.Error = err.Error()
-	} else {
-		response.Result = nextDate
-	}
+		http.Error(w, "Ошибка некстДейт", http.StatusBadRequest)
+		return
+	} //else {
+	// 	response.Result = nextDate
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	//json.NewEncoder(w).Encode(response)
@@ -52,7 +57,7 @@ func nextDateHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-type Response struct {
-	Result string `json:"result"`
-	Error  string `json:"error,omitempty"`
-}
+// type Response struct {
+// 	Result string `json:"result"`
+// 	Error  string `json:"error,omitempty"`
+// }
