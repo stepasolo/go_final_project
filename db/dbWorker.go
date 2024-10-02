@@ -16,8 +16,8 @@ func DbWorker() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	dbFile := filepath.Join(filepath.Dir(appPath), "db/scheduler.db")
-	_, err = os.Stat("db/scheduler.db")
+	dbFile := filepath.Join(filepath.Dir(appPath), "./scheduler.db")
+	_, err = os.Stat("./scheduler.db")
 
 	var install bool
 	if err != nil {
@@ -31,7 +31,7 @@ func DbWorker() {
 
 func createDB(dbFile string) {
 	fmt.Println(dbFile + "wot put")
-	db, err := sql.Open("sqlite3", "db/scheduler.db")
+	db, err := sql.Open("sqlite3", "./scheduler.db")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,4 +52,14 @@ func createDB(dbFile string) {
 		log.Fatal(err)
 	}
 	log.Println("Таблица scheduler и индекс по полю date созданы.")
+}
+
+func OpenDB() *sql.DB {
+	db, err := sql.Open("sqlite3", "./scheduler.db")
+	if err != nil {
+		log.Fatal(err)
+
+	}
+	//defer db.Close()
+	return db
 }

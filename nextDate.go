@@ -9,7 +9,7 @@ import (
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	dateFormat := "20060102"
-	debagdata, _ := time.Parse(dateFormat, "20240126") // не забудь удалить
+	debagdata := time.Now()
 
 	if repeat == "y" {
 		parseDate, err := time.Parse(dateFormat, date)
@@ -48,7 +48,13 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		}
 
 		retDate := startDate.AddDate(0, 0, days)
+
+		if (debagdata.Year() == startDate.Year()) && (int(debagdata.Month()) == int(startDate.Month())) && (debagdata.Day() == startDate.Day()) {
+			return debagdata.Format(dateFormat), err
+
+		}
 		for debagdata.After(retDate) {
+			fmt.Printf("Дата возвращаемая:%v дата текущая:%v", retDate, debagdata)
 			retDate = retDate.AddDate(0, 0, days)
 		}
 		return retDate.Format(dateFormat), err
@@ -104,6 +110,10 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 
 		nextDate := nextMonthDay(now, days, monts)
 		return nextDate.Format(dateFormat), nil
+	}
+
+	if repeat != "" {
+		return "", fmt.Errorf("некорректный параметр репита: %v", repeat)
 	}
 
 	return "Opa", nil
