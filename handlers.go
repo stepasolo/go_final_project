@@ -90,7 +90,39 @@ func PostTaskHandler(db *sql.DB) http.HandlerFunc {
 
 }
 
+func getTasksHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date ASC LIMIT 10")
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Ошибка при запросу задач из БД: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var tasks []Task
+		for rows.Next() {
+			var task Task
+			err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Ошибка при чтении данных задачи: %v", err), http.StatusInternalServerError)
+				return
+			}
+			tasks = append(tasks, task)
+		}
+
+		response := TasksResponse{
+			Tasks: tasks,
+		}
+		if len(tasks) == 0 {
+			response.Tasks = []Task{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
 type Task struct {
+	ID      string `json:"id"` //opasno
 	Date    string `json:"date"`
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
@@ -101,5 +133,10 @@ type Response struct {
 	ID string `json:"id,omitempty"`
 	//	Result string `json:"result"`
 
+	Error string `json:"error,omitempty"`
+}
+
+type TasksResponse struct {
+	Tasks []Task `json:"tasks"`
 	Error string `json:"error,omitempty"`
 }

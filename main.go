@@ -19,6 +19,7 @@ func main() {
 	fmt.Println(port)
 
 	http.HandleFunc("/api/task", PostTaskHandler(db))
+	http.HandleFunc("/api/tasks", getTasksHandler(db))
 
 	webDir := "./web"
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
