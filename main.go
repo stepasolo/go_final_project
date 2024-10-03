@@ -18,8 +18,8 @@ func main() {
 	port := fmt.Sprintf(`0.0.0.0:%s`, os.Getenv("TODO_PORT")) //для работы через WSL
 	fmt.Println(port)
 
-	http.HandleFunc("/api/task", PostTaskHandler(db))
 	http.HandleFunc("/api/tasks", getTasksHandler(db))
+	http.HandleFunc("/api/task", taskHandler(db))
 
 	webDir := "./web"
 	http.Handle("/", http.FileServer(http.Dir(webDir)))

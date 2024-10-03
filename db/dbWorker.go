@@ -2,6 +2,7 @@ package dbHelper
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -62,4 +63,29 @@ func OpenDB() *sql.DB {
 	}
 	//defer db.Close()
 	return db
+}
+
+var ErrTaskNotFound = errors.New("task not found")
+
+func GetTaskById(db *sql.DB, id int) (Task, error) {
+	var task Task
+	query := "SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?"
+	err := db.QueryRow(query, id).Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+
+	if err == sql.ErrNoRows {
+		return Task{}, ErrTaskNotFound
+	} else if err != nil {
+		return Task{}, err
+	}
+
+	return task, nil
+
+}
+
+type Task struct {
+	ID      string `json:"id"` //opasno
+	Date    string `json:"date"`
+	Title   string `json:"title"`
+	Comment string `json:"comment"`
+	Repeat  string `json:"repeat"`
 }
