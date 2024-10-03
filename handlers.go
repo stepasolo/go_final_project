@@ -194,6 +194,83 @@ func PutTaskHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func MarkTaskAsDoneHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, `{"error": "Не указан ID"}`, http.StatusBadRequest)
+			return
+		}
+
+		idForDB, _ := strconv.Atoi(id)
+		task, err := dbHelper.GetTaskById(db, idForDB)
+		if err == dbHelper.ErrTaskNotFound {
+			writeErrorResponse(w, http.StatusNotFound, `{"error": "Задача не найдена"}`)
+			return
+		} else if err != nil {
+			writeErrorResponse(w, http.StatusInternalServerError, `{"error": "Ошибка базы данных"}`)
+			return
+		}
+
+		if task.Repeat == "" {
+			_, err := db.Exec("DELETE FROM scheduler WHERE id = ?", id)
+			if err != nil {
+				http.Error(w, `{"error": "Ошибка при удалении задачи"}`, http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{}`))
+			return
+		}
+
+		fmt.Println("Vot taska", task)
+		actualDate, _ := time.Parse("20060102", task.Date)
+		fmt.Println("Vot actualDate", actualDate)
+		nextDate, err := NextDate(actualDate.AddDate(0, 0, 1), task.Date, task.Repeat)
+		fmt.Println("Vot nextDate", nextDate)
+
+		if err != nil {
+			http.Error(w, `{"error": "Ошибка при обновлении задачи"}`, http.StatusInternalServerError)
+			return
+		}
+
+		_, err = db.Exec("UPDATE scheduler SET date = ? WHERE id = ?", nextDate, id)
+		if err != nil {
+			http.Error(w, `{"error": "Ошибка при обновлении задачи"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{}`))
+	}
+}
+
+func DeleteTaskHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, `{"error": "Не указан идентификатор"}`, http.StatusBadRequest)
+			return
+		}
+
+		result, err := db.Exec("DELETE FROM scheduler WHERE id = ?", id)
+		if err != nil {
+			http.Error(w, `{"error": "Ошибка базы данных"}`, http.StatusInternalServerError)
+			return
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil || rowsAffected == 0 {
+			http.Error(w, `{"error": "Задача не найдена"}`, http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{}`))
+	}
+}
+
 func writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
@@ -208,6 +285,8 @@ func taskHandler(db *sql.DB) http.HandlerFunc {
 			GetTaskHandler(db)(w, r)
 		case http.MethodPut:
 			PutTaskHandler(db)(w, r)
+		case http.MethodDelete:
+			DeleteTaskHandler(db)(w, r)
 		default:
 			http.Error(w, "Методж не поддерживается", http.StatusMethodNotAllowed)
 		}

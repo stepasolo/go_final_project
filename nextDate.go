@@ -9,7 +9,8 @@ import (
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	dateFormat := "20060102"
-	debagdata := time.Now()
+	//debagdata := time.Now()
+	debagdata := now
 
 	if repeat == "y" {
 		parseDate, err := time.Parse(dateFormat, date)
