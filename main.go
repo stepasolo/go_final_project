@@ -20,6 +20,7 @@ func main() {
 
 	http.HandleFunc("/api/tasks", getTasksHandler(db))
 	http.HandleFunc("/api/task", taskHandler(db))
+	http.HandleFunc("/api/task/done", MarkTaskAsDoneHandler(db))
 
 	webDir := "./web"
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
