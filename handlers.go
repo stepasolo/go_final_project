@@ -81,7 +81,6 @@ func PostTaskHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Ошибка при добавлении задачи в бд", http.StatusInternalServerError)
 			return
 		}
-		//response := Response{Result: "Задача успешно добавлена"}
 		response = Response{ID: strconv.Itoa(int(id))}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -224,11 +223,8 @@ func MarkTaskAsDoneHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		fmt.Println("Vot taska", task)
 		actualDate, _ := time.Parse("20060102", task.Date)
-		fmt.Println("Vot actualDate", actualDate)
 		nextDate, err := NextDate(actualDate.AddDate(0, 0, 1), task.Date, task.Repeat)
-		fmt.Println("Vot nextDate", nextDate)
 
 		if err != nil {
 			http.Error(w, `{"error": "Ошибка при обновлении задачи"}`, http.StatusInternalServerError)

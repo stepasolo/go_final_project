@@ -55,7 +55,6 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 
 		}
 		for debagdata.After(retDate) {
-			fmt.Printf("Дата возвращаемая:%v дата текущая:%v", retDate, debagdata)
 			retDate = retDate.AddDate(0, 0, days)
 		}
 		return retDate.Format(dateFormat), err
@@ -76,7 +75,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			weekdays = append(weekdays, day)
 		}
 
-		nextDate := nextWeekday(debagdata, weekdays) // тут дата неправильная
+		nextDate := nextWeekday(debagdata, weekdays)
 		return nextDate.Format(dateFormat), nil
 
 	}
@@ -144,7 +143,7 @@ func nextWeekday(now time.Time, weekdays []int) time.Time {
 }
 
 func getLastDayMonth(year int, month time.Month) int {
-	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day() //moget tut sdelat time.local?
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 func nextMonthDay(now time.Time, days []int, months []int) time.Time {
 	year := now.Year()
@@ -169,7 +168,7 @@ func nextMonthDay(now time.Time, days []int, months []int) time.Time {
 			}
 
 			if now.Day() <= targetDay {
-				return time.Date(year, month, targetDay, 0, 0, 0, 0, time.UTC) //moget tut sdelat time.local?
+				return time.Date(year, month, targetDay, 0, 0, 0, 0, time.UTC)
 
 			}
 

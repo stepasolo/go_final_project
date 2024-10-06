@@ -14,8 +14,8 @@ func main() {
 	db := dbHelper.OpenDB()
 	fmt.Println("Zapuskaem server")
 	http.HandleFunc("/api/nextdate", nextDateHandler)
-	//port := fmt.Sprintf(`:%s`, os.Getenv("TODO_PORT"))
-	port := fmt.Sprintf(`0.0.0.0:%s`, os.Getenv("TODO_PORT")) //для работы через WSL
+	port := fmt.Sprintf(`:%s`, os.Getenv("TODO_PORT"))
+	//port := fmt.Sprintf(`0.0.0.0:%s`, os.Getenv("TODO_PORT")) //для работы через WSL
 	fmt.Println(port)
 
 	http.HandleFunc("/api/tasks", getTasksHandler(db))
@@ -49,17 +49,9 @@ func nextDateHandler(w http.ResponseWriter, r *http.Request) {
 		response.Error = err.Error()
 		http.Error(w, "Ошибка некстДейт", http.StatusBadRequest)
 		return
-	} //else {
-	// 	response.Result = nextDate
-	// }
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	//json.NewEncoder(w).Encode(response)
 	fmt.Fprint(w, nextDate)
 
 }
-
-// type Response struct {
-// 	Result string `json:"result"`
-// 	Error  string `json:"error,omitempty"`
-// }

@@ -3,7 +3,6 @@ package dbHelper
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -31,7 +30,6 @@ func DbWorker() {
 }
 
 func createDB(dbFile string) {
-	fmt.Println(dbFile + "wot put")
 	db, err := sql.Open("sqlite3", "./scheduler.db")
 	if err != nil {
 		log.Fatal(err)
@@ -83,7 +81,7 @@ func GetTaskById(db *sql.DB, id int) (Task, error) {
 }
 
 type Task struct {
-	ID      string `json:"id"` //opasno
+	ID      string `json:"id"`
 	Date    string `json:"date"`
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
