@@ -4,23 +4,31 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"time"
 
-	dbHelper "github.com/LingL42/finalGoProject/db"
+	myApi "github.com/LingL42/finalGoProject/api"
+	dataBase "github.com/LingL42/finalGoProject/db"
 )
 
 func main() {
-	dbHelper.DbWorker()
-	db := dbHelper.OpenDB()
-	fmt.Println("Zapuskaem server")
-	http.HandleFunc("/api/nextdate", nextDateHandler)
-	port := fmt.Sprintf(`:%s`, os.Getenv("TODO_PORT"))
-	//port := fmt.Sprintf(`0.0.0.0:%s`, os.Getenv("TODO_PORT")) //для работы через WSL
+	var port string
+	dataBase.DbWorker()
+	db := dataBase.OpenDB()
+	defer db.Close()
+	fmt.Println("Запускаем сервер")
+	http.HandleFunc("/api/nextdate", myApi.NextDateHandler)
+	osPort := os.Getenv("TODO_PORT")
+	if osPort != "" {
+		//port := fmt.Sprintf(`:%s`, os.Getenv("TODO_PORT"))
+		port = fmt.Sprintf(`0.0.0.0:%s`, os.Getenv("TODO_PORT")) //для работы через WSL
+	} else {
+		port = ":80"
+	}
+
 	fmt.Println(port)
 
-	http.HandleFunc("/api/tasks", getTasksHandler(db))
-	http.HandleFunc("/api/task", taskHandler(db))
-	http.HandleFunc("/api/task/done", MarkTaskAsDoneHandler(db))
+	http.HandleFunc("/api/tasks", myApi.GetTasksHandler(db))
+	http.HandleFunc("/api/task", myApi.TaskHandler(db))
+	http.HandleFunc("/api/task/done", myApi.MarkTaskAsDoneHandler(db))
 
 	webDir := "./web"
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
@@ -28,30 +36,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-}
-
-func nextDateHandler(w http.ResponseWriter, r *http.Request) {
-	nowStr := r.URL.Query().Get("now")
-	dateStr := r.URL.Query().Get("date")
-	repeatStr := r.URL.Query().Get("repeat")
-
-	now, err := time.Parse("20060102", nowStr)
-	if err != nil {
-		http.Error(w, "Неверный now", http.StatusBadRequest)
-		return
-	}
-
-	nextDate, err := NextDate(now, dateStr, repeatStr)
-	response := Response{}
-
-	if err != nil {
-		response.Error = err.Error()
-		http.Error(w, "Ошибка некстДейт", http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(w, nextDate)
 
 }

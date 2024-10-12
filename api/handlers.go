@@ -1,67 +1,74 @@
-package main
+package api
 
 import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
-	dbHelper "github.com/LingL42/finalGoProject/db"
+	nextDate "github.com/LingL42/finalGoProject/dateFunction"
+	dataBase "github.com/LingL42/finalGoProject/db"
 )
 
-func addTaskInDB(db *sql.DB, task dbHelper.Task) (int64, error) {
-	taskInBD, err := db.Exec("INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)", task.Date, task.Title, task.Comment, task.Repeat)
-	if err != nil {
-		log.Fatal("Что то не таку при добавлении в бд", err)
+func NextDateHandler(w http.ResponseWriter, r *http.Request) {
+	nowStr := r.URL.Query().Get("now")
+	dateStr := r.URL.Query().Get("date")
+	repeatStr := r.URL.Query().Get("repeat")
+
+	if !ValidateDate(w, nowStr) {
+		return
 	}
-	id, err := taskInBD.LastInsertId()
-	return id, err
+	now, _ := time.Parse(nextDate.DateFormat, nowStr)
+
+	nextDate, err := nextDate.NextDate(now, dateStr, repeatStr)
+	response := Response{}
+
+	if err != nil {
+		response.Error = err.Error()
+		http.Error(w, "Ошибка некстДейт "+response.Error, http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, nextDate)
+
 }
 
 func PostTaskHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		response := Response{}
-		var task dbHelper.Task
+		var task dataBase.Task
 		err := json.NewDecoder(r.Body).Decode(&task)
 		if err != nil {
-			response.Error = "Неверный формат джсон"
+			response.Error = "Неверный формат json"
 			w.Header().Set("Content-Type", "application/json")
 
 			json.NewEncoder(w).Encode(response)
 			return
 		}
 
-		if task.Title == "" {
-			response.Error = "Поле тайтл обязательно"
-			w.Header().Set("Content-Type", "application/json")
-
-			json.NewEncoder(w).Encode(response)
+		if !validateTitle(w, task.Title) {
 			return
 		}
 
 		now := time.Now()
-		dateFormat := "20060102"
 
 		if task.Date == "" {
-			task.Date = now.Format(dateFormat)
+			task.Date = now.Format(nextDate.DateFormat)
 		} else {
-			taskDate, err := time.Parse(dateFormat, task.Date)
-			if err != nil {
-				response.Error = "Неверный формат даты"
-				w.Header().Set("Content-Type", "application/json")
-
-				json.NewEncoder(w).Encode(response)
+			if !ValidateDate(w, task.Date) {
 				return
 			}
 
+			taskDate, _ := time.Parse(nextDate.DateFormat, task.Date)
+
 			if taskDate.Before(now) {
 				if task.Repeat == "" {
-					task.Date = now.Format(dateFormat)
+					task.Date = now.Format(nextDate.DateFormat)
 				} else {
-					nextDate, err := NextDate(now, task.Date, task.Repeat)
+					nextDate, err := nextDate.NextDate(now, task.Date, task.Repeat)
 					if err != nil {
 						response.Error = fmt.Sprintf("Ощибка в NextDate:%v", err)
 						w.Header().Set("Content-Type", "application/json")
@@ -76,7 +83,7 @@ func PostTaskHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		id, err := addTaskInDB(db, task)
+		id, err := dataBase.AddTaskInDB(db, task)
 		if err != nil {
 			http.Error(w, "Ошибка при добавлении задачи в бд", http.StatusInternalServerError)
 			return
@@ -89,18 +96,18 @@ func PostTaskHandler(db *sql.DB) http.HandlerFunc {
 
 }
 
-func getTasksHandler(db *sql.DB) http.HandlerFunc {
+func GetTasksHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date ASC LIMIT 10")
+		rows, err := dataBase.GetTasks(db)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Ошибка при запросу задач из БД: %v", err), http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		var tasks []dbHelper.Task
+		var tasks []dataBase.Task
 		for rows.Next() {
-			var task dbHelper.Task
+			var task dataBase.Task
 			err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Ошибка при чтении данных задачи: %v", err), http.StatusInternalServerError)
@@ -113,7 +120,7 @@ func getTasksHandler(db *sql.DB) http.HandlerFunc {
 			Tasks: tasks,
 		}
 		if len(tasks) == 0 {
-			response.Tasks = []dbHelper.Task{}
+			response.Tasks = []dataBase.Task{}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
@@ -123,18 +130,19 @@ func getTasksHandler(db *sql.DB) http.HandlerFunc {
 func GetTaskHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idParam := r.URL.Query().Get("id")
-		if idParam == "" {
-			writeErrorResponse(w, http.StatusBadRequest, "Не указан идентификатор")
+
+		if !validateIdParam(w, idParam) {
 			return
 		}
+
 		id, err := strconv.Atoi(idParam)
 		if err != nil {
 			writeErrorResponse(w, http.StatusBadRequest, "Неверный формат идентификатора")
 			return
 		}
 
-		task, err := dbHelper.GetTaskById(db, id)
-		if err == dbHelper.ErrTaskNotFound {
+		task, err := dataBase.GetTaskById(db, id)
+		if err == dataBase.ErrTaskNotFound {
 			writeErrorResponse(w, http.StatusNotFound, "Задача не найдена")
 			return
 		} else if err != nil {
@@ -148,35 +156,33 @@ func GetTaskHandler(db *sql.DB) http.HandlerFunc {
 
 func PutTaskHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var task dbHelper.Task
+		var task dataBase.Task
 		err := json.NewDecoder(r.Body).Decode(&task)
 		if err != nil {
 			http.Error(w, `{"error": "Неверный формат данных"}`, http.StatusBadRequest)
 			return
 		}
-		if task.ID == "" {
-			http.Error(w, `{"error": "Не указан идентификатор"}`, http.StatusBadRequest)
+
+		if !validateIdParam(w, task.ID) {
 			return
 		}
 
-		_, err = time.Parse("20060102", task.Date)
-		if err != nil {
-			http.Error(w, `{"error": "Неверный формат даты"}`, http.StatusBadRequest)
+		if !ValidateDate(w, task.Date) {
 			return
 		}
 
-		_, err = NextDate(time.Now(), task.Date, task.Repeat)
+		_, err = nextDate.NextDate(time.Now(), task.Date, task.Repeat)
 		if err != nil {
 			http.Error(w, `{"error": "Ощибка в NextDate"}`, http.StatusBadRequest)
 			return
 		}
 
-		if task.Title == "" {
-			http.Error(w, `{"error": "Поле тайтл не может быть пустым"}`, http.StatusBadRequest)
+		if !validateTitle(w, task.Title) {
 			return
 		}
-		query := "UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat = ? WHERE id = ?"
-		result, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat, task.ID)
+
+		result, err := dataBase.UpdateTask(db, task)
+
 		if err != nil {
 			http.Error(w, `{"error": "Ошибка базы данных"}`, http.StatusInternalServerError)
 			return
@@ -196,14 +202,14 @@ func PutTaskHandler(db *sql.DB) http.HandlerFunc {
 func MarkTaskAsDoneHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
-		if id == "" {
-			http.Error(w, `{"error": "Не указан ID"}`, http.StatusBadRequest)
+
+		if !validateIdParam(w, id) {
 			return
 		}
 
 		idForDB, _ := strconv.Atoi(id)
-		task, err := dbHelper.GetTaskById(db, idForDB)
-		if err == dbHelper.ErrTaskNotFound {
+		task, err := dataBase.GetTaskById(db, idForDB)
+		if err == dataBase.ErrTaskNotFound {
 			writeErrorResponse(w, http.StatusNotFound, `{"error": "Задача не найдена"}`)
 			return
 		} else if err != nil {
@@ -212,7 +218,7 @@ func MarkTaskAsDoneHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if task.Repeat == "" {
-			_, err := db.Exec("DELETE FROM scheduler WHERE id = ?", id)
+			_, err := dataBase.DeleteTask(db, id)
 			if err != nil {
 				http.Error(w, `{"error": "Ошибка при удалении задачи"}`, http.StatusInternalServerError)
 				return
@@ -223,15 +229,15 @@ func MarkTaskAsDoneHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		actualDate, _ := time.Parse("20060102", task.Date)
-		nextDate, err := NextDate(actualDate.AddDate(0, 0, 1), task.Date, task.Repeat)
+		actualDate, _ := time.Parse(nextDate.DateFormat, task.Date)
+		nextDate, err := nextDate.NextDate(actualDate.AddDate(0, 0, 1), task.Date, task.Repeat)
 
 		if err != nil {
 			http.Error(w, `{"error": "Ошибка при обновлении задачи"}`, http.StatusInternalServerError)
 			return
 		}
 
-		_, err = db.Exec("UPDATE scheduler SET date = ? WHERE id = ?", nextDate, id)
+		err = dataBase.UpdateTaskDate(db, nextDate, id)
 		if err != nil {
 			http.Error(w, `{"error": "Ошибка при обновлении задачи"}`, http.StatusInternalServerError)
 			return
@@ -245,12 +251,12 @@ func MarkTaskAsDoneHandler(db *sql.DB) http.HandlerFunc {
 func DeleteTaskHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
-		if id == "" {
-			http.Error(w, `{"error": "Не указан идентификатор"}`, http.StatusBadRequest)
+
+		if !validateIdParam(w, id) {
 			return
 		}
 
-		result, err := db.Exec("DELETE FROM scheduler WHERE id = ?", id)
+		result, err := dataBase.DeleteTask(db, id)
 		if err != nil {
 			http.Error(w, `{"error": "Ошибка базы данных"}`, http.StatusInternalServerError)
 			return
@@ -272,7 +278,7 @@ func writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
-func taskHandler(db *sql.DB) http.HandlerFunc {
+func TaskHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
@@ -284,7 +290,7 @@ func taskHandler(db *sql.DB) http.HandlerFunc {
 		case http.MethodDelete:
 			DeleteTaskHandler(db)(w, r)
 		default:
-			http.Error(w, "Методж не поддерживается", http.StatusMethodNotAllowed)
+			http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
 		}
 	}
 }
@@ -295,6 +301,6 @@ type Response struct {
 }
 
 type TasksResponse struct {
-	Tasks []dbHelper.Task `json:"tasks"`
+	Tasks []dataBase.Task `json:"tasks"`
 	Error string          `json:"error,omitempty"`
 }
